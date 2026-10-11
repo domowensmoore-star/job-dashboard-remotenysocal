@@ -76,6 +76,7 @@ MEDIUM_TITLES = [
     "marketing coordinator", "marketing specialist", "lifecycle marketing",
     "lead generation", "demand generation", "web operations",
     "marketing enablement", "crm marketing",
+    "marketing manager", "manager, marketing", "manager of marketing",
 ]
 LEVEL_OK = ["specialist", "analyst", "manager", "coordinator", "associate", "senior"]
 LEVEL_TOO_HIGH = ["director", "vp ", "vice president", "head of", "principal",
