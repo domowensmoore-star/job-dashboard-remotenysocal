@@ -71,12 +71,19 @@ MEDIUM_TITLES = [
     "web production", "digital operations", "email marketing",
     "marketing analyst", "campaign", "ad operations", "ad ops",
     "production manager", "workflow",
+    # from your resume history
+    "inbound marketing", "growth marketing", "content marketing",
+    "marketing coordinator", "marketing specialist", "lifecycle marketing",
+    "lead generation", "demand generation", "web operations",
+    "marketing enablement", "crm marketing",
 ]
 LEVEL_OK = ["specialist", "analyst", "manager", "coordinator", "associate", "senior"]
 LEVEL_TOO_HIGH = ["director", "vp ", "vice president", "head of", "principal",
                   "chief", "svp", "evp"]
-EXCLUDE_TITLES = ["intern", "internship", "sales representative", "account executive",
-                  "sdr", "bdr", "software engineer", "recruiter", "nurse"]
+EXCLUDE_TITLES = ["intern", "interns", "internship", "sales representative", "account executive",
+                  "sdr", "bdr", "software engineer", "recruiter", "nurse",
+                  # too junior for 7+ years of experience
+                  "junior", "jr", "entry level", "entry-level", "trainee", "apprentice"]
 
 # Skills from your resume. Each one found in the description adds points.
 SKILLS = [
@@ -85,7 +92,17 @@ SKILLS = [
     "google analytics", "html", "aem", "adobe experience manager",
     "sharepoint", "campaign", "lead routing", "segmentation", "sla",
     "workflow", "intake", "salesforce",
+    # added from your resume
+    "seo", "excel", "google sheets", "cvent", "figma", "css", "api",
+    "adobe creative", "a/b testing", "email automation", "lead generation",
+    "metadata", "web production", "newsletter", "landing page",
 ]
+
+
+def skills_in(text):
+    """Skills found as whole words (plurals OK), so 'excel' won't match 'excellent'."""
+    return {x for x in SKILLS
+            if re.search(r"(?<![a-z])" + re.escape(x) + r"(?:s|es)?(?![a-z])", text)}
 
 # Location preferences: REMOTE, or one of the three target regions below.
 # Anything else (Boston, Chicago, Orlando, San Francisco, ...) is dropped.
@@ -161,6 +178,7 @@ NO_SPONSOR_TERMS = ["no visa sponsorship", "no sponsorship", "unable to sponsor"
 REQUIRE_TITLE_MATCH = True    # title must match a strong or related role (drops generic "Marketing Manager")
 LOCAL_OR_REMOTE_ONLY = True   # drop jobs that are neither remote nor in SoCal / South Florida / NYC
 MAX_YEARS_REQUIRED = 8        # drop jobs demanding more years than this (you have 7+)
+MIN_YEARS_REQUIRED = 3        # drop jobs whose stated experience is below this (too junior)
 MIN_SKILLS_REQUIRED = 2       # need at least this many of your tools in the description
 MIN_SKILLS_CHECK_LEN = 800    # only enforce when the description is long enough to judge
 EXCLUDE_DESC = ["security clearance", "ts/sci", "must be a u.s. citizen",
@@ -365,7 +383,7 @@ def score_job(job, now):
     loc = job["location"].lower()
     reasons = []
 
-    if any(x in title for x in EXCLUDE_TITLES):
+    if has_kw(title, EXCLUDE_TITLES):   # whole-word match: "intern" won't hit "internal"
         return None, ["excluded title"]
     if any(x in (title + " ") for x in LEVEL_TOO_HIGH):
         return None, ["too senior"]
@@ -388,11 +406,13 @@ def score_job(job, now):
         r"(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?(?:years|yrs)[^.]{0,40}experience", desc)]
     if yrs and max(yrs) > MAX_YEARS_REQUIRED:
         return None, ["requires too many years"]
+    if yrs and max(yrs) < MIN_YEARS_REQUIRED:
+        return None, ["too junior (asks for under %d years)" % MIN_YEARS_REQUIRED]
     if LOCAL_OR_REMOTE_ONLY and not intl:
         if classify_area(job) is None:
             return None, ["not remote or in a target metro"]
     job["area"] = classify_area(job) if not intl else "intl"
-    skill_hits = {x for x in SKILLS if x in desc or x in title}
+    skill_hits = skills_in(desc) | skills_in(title)
     if len(desc) >= MIN_SKILLS_CHECK_LEN and len(skill_hits) < MIN_SKILLS_REQUIRED:
         return None, ["too few matching skills"]
 
@@ -407,7 +427,7 @@ def score_job(job, now):
         score += 10
 
     # Skill overlap (25): 5 pts per distinct skill, capped
-    hits = sorted({s for s in SKILLS if s in desc or s in title})
+    hits = sorted(skills_in(desc) | skills_in(title))
     score += min(25, 5 * len(hits))
     if hits:
         reasons.append("skills: " + ", ".join(hits[:6]))
