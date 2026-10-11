@@ -1,0 +1,32 @@
+name: Daily job dashboard
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 13:00 UTC = 9am Eastern / 6am Pacific
+  workflow_dispatch:        # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write           # lets the job commit docs/ back to the repo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build dashboard
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+        run: python dashboard.py
+
+      - name: Commit updated dashboard
+        run: |
+          git config user.name "job-bot"
+          git config user.email "job-bot@users.noreply.github.com"
+          git add docs
+          git diff --cached --quiet || (git commit -m "Update dashboard $(date -u +%F)" && git push)
